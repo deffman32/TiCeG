@@ -1,8 +1,7 @@
 #include "fonts.h"
 
 /* This contains the raw data for the font. */
-static const unsigned char drsans_font_data[] =
-{
+static const unsigned char drsans_font_data[] = {
 #include "drsans.inc"
 };
 

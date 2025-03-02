@@ -1,0 +1,22 @@
+#ifndef COLORS_H
+#define COLORS_H
+typedef enum {
+  C_LIGHT_PURPLE = 0x01,
+  C_DARK_PURPLE = 0x02,
+  C_LIGHT_BLUE = 0x11,
+  C_DARK_BLUE = 0x12,
+  C_LIGHT_TURQUOISE = 0x21,
+  C_DARK_TURQUOISE = 0x22,
+  C_LIGHT_GREEN = 0x41,
+  C_DARK_GREEN = 0x42,
+  C_LIGHT_YELLOW = 0x51,
+  C_DARK_YELLOW = 0x52,
+  C_LIGHT_RED = 0x61,
+  C_DARK_RED = 0x62,
+  C_LIGHT_PINK = 0xE1,
+  C_DARK_PINK = 0xE2,
+  C_BLACK = 0xF0,
+  C_TRANSPARENT = 0xFE,
+  C_WHITE = 0xFF,
+} color;
+#endif
