@@ -56,15 +56,59 @@ void drawCard(const int center_x, const int center_y, const card_t card) {
     string[i] = '\0';
     str_width = fontlib_GetStringWidth(string);
   }
+  fontlib_SetForegroundColor(C_BLACK);
   fontlib_DrawStringXY(string, center_x - CARD_WIDTH / 2 + STR_PADDING,
                        center_y - CARD_HEIGHT / 2 + 6);
+}
+
+void drawBigCard(const int center_x, const int center_y, const card_t card) {
+  const int BIG_CARD_WIDTH = 120;
+  const int BIG_CARD_HEIGHT = 180;
+  gfx_SetColor(C_BLACK);
+  gfx_FillRectangle(center_x - BIG_CARD_WIDTH / 2,
+                    center_y - BIG_CARD_HEIGHT / 2, BIG_CARD_WIDTH,
+                    BIG_CARD_HEIGHT);
+  gfx_SetColor(C_WHITE);
+  gfx_FillRectangle(center_x - BIG_CARD_WIDTH / 2 + 2,
+                    center_y - BIG_CARD_HEIGHT / 2 + 2, BIG_CARD_WIDTH - 4,
+                    BIG_CARD_HEIGHT - 4);
+
+  char *string = (char *)CARD_NAMES[card.card_idx];
+  unsigned int str_width = fontlib_GetStringWidth(string);
+  unsigned int i = strlen(string);
+  while (str_width > BIG_CARD_WIDTH - STR_PADDING * 2) {
+    i -= 1;
+    string[i] = '\0';
+    str_width = fontlib_GetStringWidth(string);
+  }
+  fontlib_SetForegroundColor(C_BLACK);
+  fontlib_DrawStringXY(string, center_x - BIG_CARD_WIDTH / 2 + STR_PADDING,
+                       center_y - BIG_CARD_HEIGHT / 2 + 6);
+  fontlib_SetFont(drsans_09_font, (fontlib_load_options_t)0);
+  fontlib_SetForegroundColor(C_DARK_RED);
+  char buf[4];
+  ucta(card.damage, buf);
+  const int damage_x = center_x - BIG_CARD_WIDTH / 2 + STR_PADDING + 20;
+  const int damage_y =
+      center_y + BIG_CARD_HEIGHT / 2 - 6 - fontlib_GetCurrentFontHeight();
+  fontlib_DrawStringXY(buf, damage_x, damage_y);
+  fontlib_SetForegroundColor(C_LIGHT_BLUE);
+  ucta(card.defense, buf);
+  const int defense_x =
+      center_x + BIG_CARD_WIDTH / 2 - STR_PADDING - fontlib_GetStringWidth(buf);
+  const int defense_y =
+      center_y + BIG_CARD_HEIGHT / 2 - 6 - fontlib_GetCurrentFontHeight();
+  fontlib_DrawStringXY(buf, defense_x, defense_y);
+  fontlib_SetFont(drsans_06_font, (fontlib_load_options_t)0);
+  gfx_Sprite(fist, damage_x - 20, damage_y);
+  gfx_Sprite(fist, defense_x - 20, damage_y);
 }
 
 void drawHand(const card_t *hand, const size_t handCount) {
   const int CARD_COUNT = MIN(handCount, 5);
 
   int x = CARD_WIDTH / 2;
-  int y = LCD_HEIGHT - 20;
+  int y = LCD_HEIGHT + 20;
 
   for (int i = CARD_COUNT - 1; i >= 0; i--) {
     drawCard(x, y, hand[i]);
@@ -94,7 +138,7 @@ void graphics_begin() {
 
   gfx_SetColor(C_BLACK);
 
-  fontlib_SetFont(drsans_font, (fontlib_load_options_t)0);
+  fontlib_SetFont(drsans_06_font, (fontlib_load_options_t)0);
   fontlib_SetLineSpacing(2, 2);
   fontlib_SetTransparency(true);
   fontlib_SetColors(C_BLACK, C_WHITE);
@@ -131,8 +175,8 @@ void draw() {
   gfx_FillScreen(C_WHITE);
   drawHand(game_state.hand_cards, game_state.hand_cards_count);
   if (game_state.area == M_HAND) {
-    drawCard(LCD_WIDTH / 2, LCD_HEIGHT / 2,
-             game_state.hand_cards[game_state.selected_card]);
+    drawBigCard(LCD_WIDTH / 2, LCD_HEIGHT / 2 - 20,
+                game_state.hand_cards[game_state.selected_card]);
   }
 }
 

@@ -258,12 +258,17 @@ palettes:
       - color: { index: 253, r: 221, g: 221, b: 221 }
       - color: { index: 254, r: 238, g: 238, b: 238 }
       - color: { index: 255, r: 255, g: 255, b: 255 }
+    images: automatic
 
 
 converts:
   - name: sprites
     palette: global_palette
     transparent-color-index: 254
+    images:
+      - fist.png
+      - BattleSymbol.png
+      - TradeSymbol.png
 
 outputs:
   - type: c
@@ -272,3 +277,4 @@ outputs:
       - global_palette
     converts:
       - sprites
+    const: true
