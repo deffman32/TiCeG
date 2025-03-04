@@ -25,6 +25,9 @@ gfx_UninitedRLETSprite(battle_icon,
                        (battle_icon_width + 1) * battle_icon_height);
 gfx_UninitedRLETSprite(trade_icon, (trade_icon_width + 1) * trade_icon_height);
 
+const fontlib_font_t* DEFAULT_FONT = cherry_13_font;
+const fontlib_load_options_t FONT_LOAD_OPTIONS = (fontlib_load_options_t) 0;
+
 void begin() {
   zx0_Decompress(battle_icon, battle_icon_compressed);
   zx0_Decompress(trade_icon, trade_icon_compressed);
@@ -42,7 +45,7 @@ void graphics_begin() {
 
   gfx_SetColor(C_BLACK);
 
-  fontlib_SetFont(cherry_10_font, (fontlib_load_options_t)0);
+  fontlib_SetFont(DEFAULT_FONT, FONT_LOAD_OPTIONS);
   fontlib_SetLineSpacing(1, 1);
   fontlib_SetTransparency(true);
   fontlib_SetColors(C_BLACK, C_WHITE);
@@ -56,14 +59,26 @@ bool step() {
   return key != sk_Clear;
 }
 
+uint24_t fontlib_DrawStringCentered(const char *str, unsigned int x, uint8_t y) {
+  fontlib_SetCursorPosition(x - fontlib_GetStringWidth(str) / 2, y - fontlib_GetCurrentFontHeight() / 2);
+  return fontlib_DrawString(str);
+}
+
 void draw() {
   gfx_FillScreen(0xC1);
   gfx_RLETSprite(trade_icon, (LCD_WIDTH - trade_icon_width) / 2,
                  (LCD_HEIGHT - trade_icon_height) / 2);
   gfx_RLETSprite(battle_icon, (LCD_WIDTH + battle_icon_width) / 2 + 7,
                  (LCD_HEIGHT - battle_icon_height) / 2);
-  fontlib_SetCursorPosition(10, 10);
-  fontlib_DrawString("TEST STRING");
+  gfx_SetColor(0xc0);
+  gfx_FillCircle((LCD_WIDTH + battle_icon_width) / 2 - 7 - 54 - 27, (LCD_HEIGHT - battle_icon_height) / 2 + 27, 27);
+  gfx_SetColor(0xc3);
+  gfx_Circle((LCD_WIDTH + battle_icon_width) / 2 - 7 - 54 - 27, (LCD_HEIGHT - battle_icon_height) / 2 + 27, 28);
+  fontlib_SetFont(cherry_26_font, FONT_LOAD_OPTIONS);
+  fontlib_DrawStringCentered("TICEG", LCD_WIDTH / 2, 15);
+  fontlib_SetFont(DEFAULT_FONT, FONT_LOAD_OPTIONS);
+  fontlib_DrawStringCentered("A TRADING CARD GAME FOR", LCD_WIDTH / 2, 40);
+  fontlib_DrawStringCentered("THE TI 84 PLUS CE FAMILY", LCD_WIDTH / 2, 60);
 }
 
 int main() {
