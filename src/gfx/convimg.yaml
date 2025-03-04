@@ -265,8 +265,8 @@ converts:
   - name: sprites
     palette: global_palette
     transparent-color-index: 254
+    style: rlet
     images:
-      - fist.png
       - BattleSymbol.png
       - TradeSymbol.png
 
