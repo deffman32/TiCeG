@@ -3,7 +3,9 @@
 
 #include <fontlibc.h>
 
-extern const fontlib_font_t *drsans_06_font;
-extern const fontlib_font_t *drsans_09_font;
+extern const fontlib_font_t *cherry_10_font;
+extern const fontlib_font_t *cherry_13_font;
+extern const fontlib_font_t *cherry_20_font;
+extern const fontlib_font_t *cherry_26_font;
 
 #endif

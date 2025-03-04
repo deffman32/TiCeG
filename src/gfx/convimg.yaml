@@ -266,9 +266,10 @@ converts:
     palette: global_palette
     transparent-color-index: 254
     style: rlet
+    compress: zx0
     images:
-      - BattleSymbol.png
-      - TradeSymbol.png
+      - battle_icon.png
+      - trade_icon.png
 
 outputs:
   - type: c

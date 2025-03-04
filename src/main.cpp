@@ -10,6 +10,7 @@
 #include "gfx/gfx.h"
 #include "serialize.h"
 #include "utils.h"
+#include <compression.h>
 #include <debug.h>
 #include <fileioc.h>
 #include <fontlibc.h>
@@ -20,7 +21,14 @@
 const char *CARD_NAMES[] = {"Test Card 1", "Test Card 2", "Test Card 3",
                             "Test Card 4"};
 
-void begin() {}
+gfx_UninitedRLETSprite(battle_icon,
+                       (battle_icon_width + 1) * battle_icon_height);
+gfx_UninitedRLETSprite(trade_icon, (trade_icon_width + 1) * trade_icon_height);
+
+void begin() {
+  zx0_Decompress(battle_icon, battle_icon_compressed);
+  zx0_Decompress(trade_icon, trade_icon_compressed);
+}
 
 void graphics_begin() {
   gfx_Begin();
@@ -34,8 +42,8 @@ void graphics_begin() {
 
   gfx_SetColor(C_BLACK);
 
-  fontlib_SetFont(drsans_06_font, (fontlib_load_options_t)0);
-  fontlib_SetLineSpacing(2, 2);
+  fontlib_SetFont(cherry_10_font, (fontlib_load_options_t)0);
+  fontlib_SetLineSpacing(1, 1);
   fontlib_SetTransparency(true);
   fontlib_SetColors(C_BLACK, C_WHITE);
 }
@@ -50,8 +58,12 @@ bool step() {
 
 void draw() {
   gfx_FillScreen(0xC1);
-  gfx_RLETSprite(TradeSymbol, LCD_WIDTH / 2 - TradeSymbol_width / 2,
-                 LCD_HEIGHT / 2 - TradeSymbol_height / 2);
+  gfx_RLETSprite(trade_icon, (LCD_WIDTH - trade_icon_width) / 2,
+                 (LCD_HEIGHT - trade_icon_height) / 2);
+  gfx_RLETSprite(battle_icon, (LCD_WIDTH + battle_icon_width) / 2 + 7,
+                 (LCD_HEIGHT - battle_icon_height) / 2);
+  fontlib_SetCursorPosition(10, 10);
+  fontlib_DrawString("TEST STRING");
 }
 
 int main() {
