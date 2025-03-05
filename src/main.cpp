@@ -101,10 +101,12 @@ void drawHomeScreen() {
 
 void drawDeckScreen() {
   gfx_FillScreen(0xC1);
-  fontlib_SetForegroundColor(0xC3);
-  fontlib_SetCursorPosition(10, 10);
   fontlib_SetFont(cherry_20_font, FONT_LOAD_OPTIONS);
-  fontlib_DrawString("DECKS");
+  fontlib_SetForegroundColor(0xC3);
+  fontlib_DrawStringCentered("DECKS", LCD_WIDTH / 2, 3);
+  gfx_SetColor(0xC3);
+  gfx_FillRectangle(0, 35, LCD_WIDTH, 4);
+  RESET_FONT();
 }
 
 void draw() {
