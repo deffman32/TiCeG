@@ -270,6 +270,7 @@ converts:
     images:
       - battle_icon.png
       - trade_icon.png
+      - decks_icon.png
 
 outputs:
   - type: c
