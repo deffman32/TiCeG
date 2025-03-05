@@ -4,3 +4,6 @@ obj/
 .DS_Store
 .idea/
 *.inc
+src/gfx/*.h
+src/gfx/*.c
+*.yaml.lst
