@@ -39,6 +39,12 @@ template <typename T> struct fat_ptr {
   size_t size;
 };
 
+template <typename T> constexpr fat_ptr<T> fat_nullptr = {nullptr, 0};
+
+template <typename T> constexpr inline bool is_fat_nullptr(fat_ptr<T> fp) {
+  return fp.ptr == nullptr || fp.size == 0;
+}
+
 static const char *const digit_table[100] = {
     "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",  "10", "11",
     "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23",
