@@ -18,6 +18,7 @@
 #include <graphx.h>
 #include <string.h>
 #include <tice.h>
+#include "tests.h"
 
 state_t global_state;
 
