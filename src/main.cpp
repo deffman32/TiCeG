@@ -40,6 +40,10 @@ void begin() {
   zx0_Decompress(battle_icon, battle_icon_compressed);
   zx0_Decompress(trade_icon, trade_icon_compressed);
   zx0_Decompress(decks_icon, decks_icon_compressed);
+
+  #ifndef NDEBUG
+    test_serialize();
+  #endif
 }
 
 void graphics_begin() {

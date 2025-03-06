@@ -102,4 +102,5 @@ fat_ptr<deck_t> deserialize_decks(const fat_ptr<uint8_t> &bytes) {
 
   return {decks, 10};
 }
+
 #endif
