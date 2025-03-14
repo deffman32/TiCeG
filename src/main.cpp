@@ -264,6 +264,8 @@ void drawDeckEditScreen() {
 
 uint8_t SELECTED_DECK_INDEX = 0;
 
+bool EDITING_DECK_NAME = false;
+
 void drawDeckScreen() {
   gfx_FillScreen(0xC3);
   ticeg_SetFont(FONT_CHERRY_13);
@@ -273,7 +275,14 @@ void drawDeckScreen() {
   fontlib_SetForegroundColor(C_BLACK);
   fontlib_DrawStringCentered("WHICH DECK WOULD YOU LIKE TO EDIT?",
                              LCD_WIDTH / 2, 20);
-  gfx_FillRoundedRect(0, 43, LCD_WIDTH, LCD_HEIGHT, 8);
+
+  gfx_FillRoundedRect(0, 43, LCD_WIDTH, LCD_HEIGHT - 40, 8);
+  gfx_FillRoundedRect(0, LCD_HEIGHT - 37, LCD_WIDTH, LCD_HEIGHT, 8);
+
+  fontlib_SetCursorPosition(5, LCD_HEIGHT - 35);
+  fontlib_DrawString("[STAT] Edit deck name");
+  fontlib_SetCursorPosition(5, LCD_HEIGHT - 17);
+  fontlib_DrawString("[DEL] Clear deck");
 
   for (size_t i = 0; i < MAX_DECKS; i++) {
     deck_t deck = global_state.decks[i];
@@ -281,7 +290,7 @@ void drawDeckScreen() {
 
     gfx_SetColor(0xC3);
 
-    int y = 50 + i * 15 + CURRENT_FONT_HEIGHT / 2;
+    int y = 46 + i * 15 + CURRENT_FONT_HEIGHT / 2;
 
     if (i == SELECTED_DECK_INDEX) {
       gfx_FillRectangle(6, y, 6, 6);
@@ -289,7 +298,7 @@ void drawDeckScreen() {
       gfx_Rectangle(6, y, 6, 6);
     }
 
-    fontlib_SetCursorPosition(15, 50 + i * 15);
+    fontlib_SetCursorPosition(15, 46 + i * 15);
 
     if (deck_name[0] == '\0') {
       if (!is_fat_nullptr(deck.cards)) {
@@ -301,6 +310,16 @@ void drawDeckScreen() {
     } else {
       fontlib_DrawString(deck_name);
     }
+  }
+
+  if (EDITING_DECK_NAME) {
+    const int BORDER_WIDTH = 3;
+    gfx_FillRoundedRect(LCD_WIDTH / 8, LCD_HEIGHT / 4, LCD_WIDTH / 8 * 7,
+                        LCD_HEIGHT / 4 * 3, 8);
+    gfx_SetColor(0xC5);
+    gfx_FillRoundedRect(
+        LCD_WIDTH / 8 + BORDER_WIDTH, LCD_HEIGHT / 4 + BORDER_WIDTH,
+        LCD_WIDTH / 8 * 7 - BORDER_WIDTH, LCD_HEIGHT / 4 * 3 - BORDER_WIDTH, 8);
   }
 }
 
@@ -322,6 +341,8 @@ void draw() {
 
 bool step() {
   const uint8_t key = os_GetCSC();
+
+  bool shouldExit = key == sk_Clear && !EDITING_DECK_NAME;
 
   if (global_state.current_screen == M_HOME) {
     switch (key) {
@@ -345,29 +366,38 @@ bool step() {
       break;
     }
   } else if (global_state.current_screen == M_DECKS) {
-    switch (key) {
-    case sk_Up:
-      if (SELECTED_DECK_INDEX > 0) {
-        SELECTED_DECK_INDEX -= 1;
+    if (!EDITING_DECK_NAME) {
+      switch (key) {
+      case sk_Up:
+        if (SELECTED_DECK_INDEX > 0) {
+          SELECTED_DECK_INDEX -= 1;
+        }
+        break;
+      case sk_Down:
+        if (SELECTED_DECK_INDEX < MAX_DECKS - 1) {
+          SELECTED_DECK_INDEX += 1;
+        }
+        break;
+      case sk_Mode:
+        global_state.current_screen = M_HOME;
+        SELECTED_MENU_IDX = 1;
+        SELECTED_DECK_INDEX = 0;
+        break;
+      case sk_Stat:
+        EDITING_DECK_NAME = true;
+        break;
+      case sk_Enter:
+        global_state.current_screen = M_EDIT_DECK;
+        break;
       }
-      break;
-    case sk_Down:
-      if (SELECTED_DECK_INDEX < MAX_DECKS - 1) {
-        SELECTED_DECK_INDEX += 1;
+    } else {
+      if (key == sk_Clear) {
+        EDITING_DECK_NAME = false;
       }
-      break;
-    case sk_Mode:
-      global_state.current_screen = M_HOME;
-      SELECTED_MENU_IDX = 1;
-      SELECTED_DECK_INDEX = 0;
-      break;
-    case sk_Enter:
-      global_state.current_screen = M_EDIT_DECK;
-      break;
     }
   }
 
-  return key != sk_Clear;
+  return !shouldExit;
 }
 
 int main() {
