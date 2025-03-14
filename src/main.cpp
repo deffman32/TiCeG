@@ -31,10 +31,12 @@ state_t global_state;
 const char *CARD_NAMES[] = {"Test Card 1", "Test Card 2", "Test Card 3",
                             "Test Card 4"};
 
-gfx_UninitedRLETSprite(battle_icon,
-                       (battle_icon_width + 1) * battle_icon_height);
-gfx_UninitedRLETSprite(trade_icon, (trade_icon_width + 1) * trade_icon_height);
-gfx_UninitedRLETSprite(decks_icon, (decks_icon_width + 1) * decks_icon_height);
+gfx_UninitedRLETSprite(battle_icon, battle_icon_size);
+gfx_UninitedRLETSprite(trade_icon, trade_icon_size);
+gfx_UninitedRLETSprite(decks_icon, decks_icon_size);
+
+gfx_UninitedRLETSprite(left_arrow, left_arrow_size);
+gfx_UninitedRLETSprite(right_arrow, right_arrow_size);
 
 typedef enum {
   FONT_CHERRY_10,
@@ -87,6 +89,8 @@ void begin() {
   zx0_Decompress(battle_icon, battle_icon_compressed);
   zx0_Decompress(trade_icon, trade_icon_compressed);
   zx0_Decompress(decks_icon, decks_icon_compressed);
+  zx0_Decompress(left_arrow, left_arrow_compressed);
+  zx0_Decompress(right_arrow, right_arrow_compressed);
 
   dbg_printf("Importing data...\n");
 
@@ -211,6 +215,21 @@ void drawHomeScreen() {
   fontlib_SetForegroundColor(C_BLACK);
 }
 
+typedef enum {
+  T_UNIT_CARD = 0,
+  T_SUPPORT_CARD = 1,
+  T_EFFECT_CARD = 2,
+  T_DRAW_CARD = 3,
+} card_type_t;
+
+const char *serialize_card_type(card_type_t type) {
+  const char *TYPE_NAMES[] = {"UNIT", "SUPPORT", "EFFECT", "DRAW"};
+  return TYPE_NAMES[type];
+}
+
+card_type_t DECK_PANEL_CARD_TYPE = T_UNIT_CARD;
+card_type_t CARDS_PANEL_CARD_TYPE = T_SUPPORT_CARD;
+
 void drawDeckEditScreen() {
   gfx_FillScreen(0xC3);
   ticeg_SetFont(FONT_CHERRY_20);
@@ -220,7 +239,27 @@ void drawDeckEditScreen() {
   fontlib_SetForegroundColor(C_BLACK);
   fontlib_DrawStringCentered("DECKS", LCD_WIDTH / 4, 20);
   gfx_FillRoundedRect(LCD_WIDTH / 2 + 5, 0, LCD_WIDTH, 40, 8);
-  fontlib_DrawStringCentered("YOUR CARDS", LCD_WIDTH / 4 * 3, 20);
+  fontlib_DrawStringCentered("YOUR CARDS", LCD_WIDTH / 4 * 3 + 5, 20);
+  gfx_FillRoundedRect(0, 45, LCD_WIDTH / 2, LCD_HEIGHT - 35, 8);
+  gfx_FillRoundedRect(LCD_WIDTH / 2 + 5, 45, LCD_WIDTH, LCD_HEIGHT, 8);
+
+  gfx_FillRoundedRect(0, LCD_HEIGHT - 30, LCD_WIDTH / 2, LCD_HEIGHT, 8);
+  ticeg_SetFont(FONT_CHERRY_10);
+  fontlib_SetCursorPosition(5, LCD_HEIGHT - 28);
+  fontlib_DrawString("[MODE] Switch Panels");
+
+  ticeg_SetFont(FONT_CHERRY_13);
+  fontlib_DrawStringCentered(serialize_card_type(DECK_PANEL_CARD_TYPE),
+                             LCD_WIDTH / 4, 55);
+
+  gfx_RLETSprite(left_arrow, 5, 51);
+  gfx_RLETSprite(right_arrow, LCD_WIDTH / 2 - 5 - right_arrow_width, 51);
+
+  fontlib_DrawStringCentered(serialize_card_type(CARDS_PANEL_CARD_TYPE),
+                             LCD_WIDTH / 4 * 3 + 5, 55);
+
+  gfx_RLETSprite(left_arrow, LCD_WIDTH / 2 + 10, 51);
+  gfx_RLETSprite(right_arrow, LCD_WIDTH - 5 - right_arrow_width, 51);
 }
 
 uint8_t SELECTED_DECK_INDEX = 0;
@@ -237,7 +276,8 @@ void drawDeckScreen() {
   gfx_FillRoundedRect(0, 43, LCD_WIDTH, LCD_HEIGHT, 8);
 
   for (size_t i = 0; i < MAX_DECKS; i++) {
-    char *deck_name = global_state.decks[i].name;
+    deck_t deck = global_state.decks[i];
+    char *deck_name = deck.name;
 
     gfx_SetColor(0xC3);
 
@@ -252,7 +292,12 @@ void drawDeckScreen() {
     fontlib_SetCursorPosition(15, 50 + i * 15);
 
     if (deck_name[0] == '\0') {
-      fontlib_DrawString("<EMPTY>");
+      if (!is_fat_nullptr(deck.cards)) {
+        fontlib_DrawString("Deck ");
+        fontlib_DrawString(digit_table[i + 1]);
+      } else {
+        fontlib_DrawString("<EMPTY>");
+      }
     } else {
       fontlib_DrawString(deck_name);
     }
@@ -266,6 +311,9 @@ void draw() {
     break;
   case M_DECKS:
     drawDeckScreen();
+    break;
+  case M_EDIT_DECK:
+    drawDeckEditScreen();
     break;
   default:
     break;
@@ -311,6 +359,10 @@ bool step() {
     case sk_Mode:
       global_state.current_screen = M_HOME;
       SELECTED_MENU_IDX = 1;
+      SELECTED_DECK_INDEX = 0;
+      break;
+    case sk_Enter:
+      global_state.current_screen = M_EDIT_DECK;
       break;
     }
   }

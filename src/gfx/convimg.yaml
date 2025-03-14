@@ -260,9 +260,15 @@ palettes:
       - color: { index: 255, r: 255, g: 255, b: 255 }
     images: automatic
 
-
 converts:
   - name: sprites
+    palette: global_palette
+    compress: zx0
+    transparent-color-index: 254
+    #images:
+
+converts:
+  - name: rlet_sprites
     palette: global_palette
     transparent-color-index: 254
     style: rlet
@@ -271,6 +277,8 @@ converts:
       - battle_icon.png
       - trade_icon.png
       - decks_icon.png
+      - left_arrow.png
+      - right_arrow.png
 
 outputs:
   - type: c
@@ -279,4 +287,5 @@ outputs:
       - global_palette
     converts:
       - sprites
+      - rlet_sprites
     const: true
