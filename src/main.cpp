@@ -1,3 +1,8 @@
+#define ENABLE_TESTS false
+
+// Just for debug purposes
+#define RESET_DATA false
+
 #ifndef __INT24_TYPE__
 #define __INT24_TYPE__
 #endif
@@ -8,6 +13,7 @@
 #include "colors.h"
 #include "fonts/fonts.h"
 #include "gfx/gfx.h"
+#include "graphics.h"
 #include "serialize.h"
 #include "state.h"
 #include "utils.h"
@@ -18,7 +24,6 @@
 #include <graphx.h>
 #include <string.h>
 #include <tice.h>
-#include "tests.h"
 
 state_t global_state;
 
@@ -30,20 +35,94 @@ gfx_UninitedRLETSprite(battle_icon,
 gfx_UninitedRLETSprite(trade_icon, (trade_icon_width + 1) * trade_icon_height);
 gfx_UninitedRLETSprite(decks_icon, (decks_icon_width + 1) * decks_icon_height);
 
-const fontlib_font_t *DEFAULT_FONT = cherry_13_font;
-#define FONT_LOAD_OPTIONS ((fontlib_load_options_t)0)
-#define RESET_FONT() fontlib_SetFont(DEFAULT_FONT, FONT_LOAD_OPTIONS)
+typedef enum {
+  FONT_CHERRY_10,
+  FONT_CHERRY_13,
+  FONT_CHERRY_20,
+  FONT_CHERRY_26
+} font_type_t;
+
+constexpr font_type_t DEFAULT_FONT = FONT_CHERRY_13;
+
+font_type_t CURRENT_FONT = FONT_CHERRY_13;
+
+__attribute__((always_inline)) inline bool ticeg_SetFont(font_type_t font) {
+  if (CURRENT_FONT != font) {
+    const fontlib_font_t *font_data = NULL;
+    switch (font) {
+    case FONT_CHERRY_10:
+      font_data = cherry_10_font;
+      break;
+    case FONT_CHERRY_13:
+      font_data = cherry_13_font;
+      break;
+    case FONT_CHERRY_20:
+      font_data = cherry_20_font;
+      break;
+    case FONT_CHERRY_26:
+      font_data = cherry_26_font;
+      break;
+    default:
+      return false;
+    }
+    CURRENT_FONT = font;
+    return fontlib_SetFont(font_data, (fontlib_load_options_t)0);
+  }
+  return true;
+}
+
+__attribute__((always_inline)) inline bool ticeg_ResetFont() {
+  return ticeg_SetFont(DEFAULT_FONT);
+}
+
+const char *DATA_FILE_NAME = "TiCeG Data";
 
 void begin() {
-  state_t state = {M_HOME};
+  state_t state = {M_HOME, {[0 ... 9] = EMPTY_DECK}};
   global_state = state;
   zx0_Decompress(battle_icon, battle_icon_compressed);
   zx0_Decompress(trade_icon, trade_icon_compressed);
   zx0_Decompress(decks_icon, decks_icon_compressed);
 
-  #ifndef NDEBUG
-    test_serialize();
-  #endif
+  dbg_printf("Importing data...\n");
+
+#if RESET_DATA
+  ti_Delete(DATA_FILE_NAME);
+#endif
+
+  uint8_t handle;
+
+  if ((handle = ti_Open(DATA_FILE_NAME, "r+")) == 0) {
+    if ((handle = ti_Open(DATA_FILE_NAME, "w+")) == 0) {
+      dbg_printf("Error reading data!");
+      exit(0);
+    }
+    fat_ptr<uint8_t> data = serialize_decks(global_state.decks);
+    ti_Write(data.ptr, 1, data.size, handle);
+  }
+
+  uint16_t size = ti_GetSize(handle);
+
+  fat_ptr<uint8_t> buf = {new uint8_t[size], size};
+
+  ti_Read(buf.ptr, sizeof(uint8_t), size, handle);
+
+  fat_ptr<deck_t> decks = deserialize_decks(buf);
+
+  for (size_t i = 0; i < decks.size; i++) {
+    global_state.decks[i] = decks.ptr[i];
+  };
+
+  dbg_printf("User Data Size: %d\n", size);
+
+  ti_SetArchiveStatus(true, handle);
+
+  ti_Close(handle);
+
+#if ENABLE_TESTS
+#include "tests.h"
+  test_serialize();
+#endif
 }
 
 void graphics_begin() {
@@ -58,13 +137,39 @@ void graphics_begin() {
 
   gfx_SetColor(C_BLACK);
 
-  RESET_FONT();
+  ticeg_ResetFont();
   fontlib_SetLineSpacing(1, 1);
   fontlib_SetTransparency(true);
   fontlib_SetColors(C_BLACK, C_WHITE);
 }
 
-void end() {}
+bool save_data() {
+  dbg_printf("Saving data...\n");
+
+  uint8_t handle;
+
+  if ((handle = ti_Open(DATA_FILE_NAME, "w+")) == 0) {
+    return false;
+  }
+
+  fat_ptr<uint8_t> buf = serialize_decks(global_state.decks);
+
+  ti_Write(buf.ptr, sizeof(uint8_t), buf.size, handle);
+
+  dbg_printf("User Data Size: %d\n", buf.size);
+
+  ti_SetArchiveStatus(true, handle);
+
+  ti_Close(handle);
+
+  return true;
+}
+
+void end() {
+  if (!save_data()) {
+    dbg_printf("Error writing data!");
+  }
+}
 
 uint24_t fontlib_DrawStringCentered(const char *str, unsigned int x,
                                     uint8_t y) {
@@ -84,12 +189,12 @@ void drawHomeScreen() {
   gfx_RLETSprite(decks_icon,
                  (LCD_WIDTH - decks_icon_width) / 2 - 7 - decks_icon_width,
                  (LCD_HEIGHT - decks_icon_height) / 2);
-  fontlib_SetFont(cherry_26_font, FONT_LOAD_OPTIONS);
+  ticeg_SetFont(FONT_CHERRY_26);
   fontlib_DrawStringCentered("TICEG", LCD_WIDTH / 2, 15);
-  RESET_FONT();
+  ticeg_SetFont(FONT_CHERRY_13);
   fontlib_DrawStringCentered("A TRADING CARD GAME FOR", LCD_WIDTH / 2, 40);
   fontlib_DrawStringCentered("THE TI 84 PLUS CE FAMILY", LCD_WIDTH / 2, 60);
-  fontlib_SetFont(cherry_10_font, FONT_LOAD_OPTIONS);
+  ticeg_SetFont(FONT_CHERRY_10);
 
   const char *menu_items[] = {"DECKS", "BATTLE", "TRADE"};
   const int x_positions[] = {LCD_WIDTH / 2 - battle_icon_width - 7,
@@ -100,18 +205,19 @@ void drawHomeScreen() {
     fontlib_DrawStringCentered(menu_items[i], x_positions[i],
                                (LCD_HEIGHT + battle_icon_height) / 2 + 7);
   }
-  RESET_FONT();
   fontlib_SetForegroundColor(C_BLACK);
 }
 
 void drawDeckScreen() {
-  gfx_FillScreen(0xC1);
-  fontlib_SetFont(cherry_20_font, FONT_LOAD_OPTIONS);
-  fontlib_SetForegroundColor(0xC3);
-  fontlib_DrawStringCentered("DECKS", LCD_WIDTH / 2, 3);
-  gfx_SetColor(0xC3);
-  gfx_FillRectangle(0, 35, LCD_WIDTH, 4);
-  RESET_FONT();
+  gfx_FillScreen(0xC3);
+  ticeg_SetFont(FONT_CHERRY_20);
+
+  gfx_SetColor(0xC1);
+  gfx_FillRoundedRect(0, 0, LCD_WIDTH / 2, 40, 8);
+  fontlib_SetForegroundColor(C_BLACK);
+  fontlib_DrawStringCentered("DECKS", LCD_WIDTH / 4, 20);
+  gfx_FillRoundedRect(LCD_WIDTH / 2 + 5, 0, LCD_WIDTH, 40, 8);
+  fontlib_DrawStringCentered("YOUR CARDS", LCD_WIDTH / 4 * 3, 20);
 }
 
 void draw() {
@@ -130,25 +236,31 @@ void draw() {
 bool step() {
   const uint8_t key = os_GetCSC();
 
-  switch (key) {
-  case sk_Left:
-    selectedMenuIdx = MAX(selectedMenuIdx - 1, 0);
-    break;
-  case sk_Right:
-    selectedMenuIdx = MIN(selectedMenuIdx + 1, 2);
-    break;
-  case sk_Enter:
-    switch (selectedMenuIdx) {
-    case 0:
-      global_state.current_screen = M_DECKS;
+  if (global_state.current_screen == M_HOME) {
+  }
+
+  if (global_state.current_screen == M_HOME) {
+    switch (key) {
+    case sk_Left:
+      selectedMenuIdx = MAX(selectedMenuIdx - 1, 0);
       break;
-    };
-    break;
-  case sk_Mode:
-    global_state.current_screen = M_HOME;
-    selectedMenuIdx = 1;
-  default:
-    break;
+    case sk_Right:
+      selectedMenuIdx = MIN(selectedMenuIdx + 1, 2);
+      break;
+    case sk_Enter:
+      switch (selectedMenuIdx) {
+      case 0:
+        global_state.current_screen = M_DECKS;
+        break;
+      };
+      break;
+    }
+  } else if (global_state.current_screen == M_DECKS) {
+    switch (key) {
+    case sk_Mode:
+      global_state.current_screen = M_HOME;
+      selectedMenuIdx = 1;
+    }
   }
 
   return key != sk_Clear;

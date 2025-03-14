@@ -53,11 +53,9 @@ fat_ptr<card_t> deserialize_cards(const fat_ptr<uint8_t> &bytes) {
   return fat_ptr<card_t>{cards, num_cards};
 }
 
-const size_t MAX_DECKS = 10;
-
-fat_ptr<uint8_t> serialize_decks(deck_t decks[10]) {
+fat_ptr<uint8_t> serialize_decks(deck_t decks[MAX_DECKS]) {
   size_t total_size = 0;
-  for (int i = 0; i < 10; i++) {
+  for (size_t i = 0; i < MAX_DECKS; i++) {
     deck_t deck = decks[i];
     total_size += 1;
     if (!is_fat_nullptr(deck.cards)) {
@@ -67,7 +65,7 @@ fat_ptr<uint8_t> serialize_decks(deck_t decks[10]) {
 
   uint8_t *buf = new uint8_t[total_size];
   int offset = 0;
-  for (int i = 0; i < 10; i++) {
+  for (size_t i = 0; i < MAX_DECKS; i++) {
     deck_t deck = decks[i];
     if (is_fat_nullptr(deck.cards)) {
       buf[offset++] = 0;
@@ -83,10 +81,10 @@ fat_ptr<uint8_t> serialize_decks(deck_t decks[10]) {
 }
 
 fat_ptr<deck_t> deserialize_decks(const fat_ptr<uint8_t> &bytes) {
-  deck_t *decks = new deck_t[10];
+  deck_t *decks = new deck_t[MAX_DECKS];
   size_t offset = 0;
 
-  for (int i = 0; i < 10; i++) {
+  for (size_t i = 0; i < MAX_DECKS; i++) {
     uint8_t card_count = bytes.ptr[offset];
     if (card_count == 0) {
       decks[i] = EMPTY_DECK;
@@ -100,7 +98,7 @@ fat_ptr<deck_t> deserialize_decks(const fat_ptr<uint8_t> &bytes) {
     dbg_printf("%d\n", card_count);
   }
 
-  return {decks, 10};
+  return {decks, MAX_DECKS};
 }
 
 #endif
