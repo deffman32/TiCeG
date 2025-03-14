@@ -16,6 +16,7 @@
 #include "graphics.h"
 #include "serialize.h"
 #include "state.h"
+#include "tests.h"
 #include "utils.h"
 #include <compression.h>
 #include <debug.h>
@@ -45,6 +46,7 @@ typedef enum {
 constexpr font_type_t DEFAULT_FONT = FONT_CHERRY_13;
 
 font_type_t CURRENT_FONT = FONT_CHERRY_13;
+uint8_t CURRENT_FONT_HEIGHT = 13;
 
 __attribute__((always_inline)) inline bool ticeg_SetFont(font_type_t font) {
   if (CURRENT_FONT != font) {
@@ -66,7 +68,9 @@ __attribute__((always_inline)) inline bool ticeg_SetFont(font_type_t font) {
       return false;
     }
     CURRENT_FONT = font;
-    return fontlib_SetFont(font_data, (fontlib_load_options_t)0);
+    bool ret = fontlib_SetFont(font_data, (fontlib_load_options_t)0);
+    CURRENT_FONT_HEIGHT = fontlib_GetCurrentFontHeight();
+    return ret;
   }
   return true;
 }
@@ -107,6 +111,10 @@ void begin() {
 
   ti_Read(buf.ptr, sizeof(uint8_t), size, handle);
 
+  ti_SetArchiveStatus(true, handle);
+
+  ti_Close(handle);
+
   fat_ptr<deck_t> decks = deserialize_decks(buf);
 
   for (size_t i = 0; i < decks.size; i++) {
@@ -115,14 +123,9 @@ void begin() {
 
   dbg_printf("User Data Size: %d\n", size);
 
-  ti_SetArchiveStatus(true, handle);
-
-  ti_Close(handle);
-
-#if ENABLE_TESTS
-#include "tests.h"
-  test_serialize();
-#endif
+  if (ENABLE_TESTS) {
+    test_serialize();
+  }
 }
 
 void graphics_begin() {
@@ -178,7 +181,7 @@ uint24_t fontlib_DrawStringCentered(const char *str, unsigned int x,
   return fontlib_DrawString(str);
 }
 
-int selectedMenuIdx = 1;
+uint8_t SELECTED_MENU_IDX = 1;
 
 void drawHomeScreen() {
   gfx_FillScreen(0xC1);
@@ -201,14 +204,14 @@ void drawHomeScreen() {
                              LCD_WIDTH / 2,
                              LCD_WIDTH / 2 + battle_icon_width + 7};
   for (int i = 0; i < 3; i++) {
-    fontlib_SetForegroundColor(selectedMenuIdx == i ? 0xC3 : 0xC2);
+    fontlib_SetForegroundColor(SELECTED_MENU_IDX == i ? 0xC3 : 0xC2);
     fontlib_DrawStringCentered(menu_items[i], x_positions[i],
                                (LCD_HEIGHT + battle_icon_height) / 2 + 7);
   }
   fontlib_SetForegroundColor(C_BLACK);
 }
 
-void drawDeckScreen() {
+void drawDeckEditScreen() {
   gfx_FillScreen(0xC3);
   ticeg_SetFont(FONT_CHERRY_20);
 
@@ -218,6 +221,42 @@ void drawDeckScreen() {
   fontlib_DrawStringCentered("DECKS", LCD_WIDTH / 4, 20);
   gfx_FillRoundedRect(LCD_WIDTH / 2 + 5, 0, LCD_WIDTH, 40, 8);
   fontlib_DrawStringCentered("YOUR CARDS", LCD_WIDTH / 4 * 3, 20);
+}
+
+uint8_t SELECTED_DECK_INDEX = 0;
+
+void drawDeckScreen() {
+  gfx_FillScreen(0xC3);
+  ticeg_SetFont(FONT_CHERRY_13);
+
+  gfx_SetColor(0xC1);
+  gfx_FillRoundedRect(0, 0, LCD_WIDTH, 40, 8);
+  fontlib_SetForegroundColor(C_BLACK);
+  fontlib_DrawStringCentered("WHICH DECK WOULD YOU LIKE TO EDIT?",
+                             LCD_WIDTH / 2, 20);
+  gfx_FillRoundedRect(0, 43, LCD_WIDTH, LCD_HEIGHT, 8);
+
+  for (size_t i = 0; i < MAX_DECKS; i++) {
+    char *deck_name = global_state.decks[i].name;
+
+    gfx_SetColor(0xC3);
+
+    int y = 50 + i * 15 + CURRENT_FONT_HEIGHT / 2;
+
+    if (i == SELECTED_DECK_INDEX) {
+      gfx_FillRectangle(6, y, 6, 6);
+    } else {
+      gfx_Rectangle(6, y, 6, 6);
+    }
+
+    fontlib_SetCursorPosition(15, 50 + i * 15);
+
+    if (deck_name[0] == '\0') {
+      fontlib_DrawString("<EMPTY>");
+    } else {
+      fontlib_DrawString(deck_name);
+    }
+  }
 }
 
 void draw() {
@@ -237,29 +276,42 @@ bool step() {
   const uint8_t key = os_GetCSC();
 
   if (global_state.current_screen == M_HOME) {
-  }
-
-  if (global_state.current_screen == M_HOME) {
     switch (key) {
     case sk_Left:
-      selectedMenuIdx = MAX(selectedMenuIdx - 1, 0);
+      if (SELECTED_MENU_IDX != 0) {
+        SELECTED_MENU_IDX -= 1;
+      }
       break;
     case sk_Right:
-      selectedMenuIdx = MIN(selectedMenuIdx + 1, 2);
+      if (SELECTED_MENU_IDX < 2) {
+        SELECTED_MENU_IDX += 1;
+      }
       break;
     case sk_Enter:
-      switch (selectedMenuIdx) {
+      switch (SELECTED_MENU_IDX) {
       case 0:
         global_state.current_screen = M_DECKS;
+        SELECTED_DECK_INDEX = 0;
         break;
       };
       break;
     }
   } else if (global_state.current_screen == M_DECKS) {
     switch (key) {
+    case sk_Up:
+      if (SELECTED_DECK_INDEX > 0) {
+        SELECTED_DECK_INDEX -= 1;
+      }
+      break;
+    case sk_Down:
+      if (SELECTED_DECK_INDEX < MAX_DECKS - 1) {
+        SELECTED_DECK_INDEX += 1;
+      }
+      break;
     case sk_Mode:
       global_state.current_screen = M_HOME;
-      selectedMenuIdx = 1;
+      SELECTED_MENU_IDX = 1;
+      break;
     }
   }
 

@@ -145,7 +145,11 @@ void gfx_RoundedRect(int x1, int y1, int x2, int y2, int r) {
 
 __attribute__((always_inline)) inline void
 gfx_FillRoundedRect(int x1, int y1, int x2, int y2, int radius) {
-  int r = min(radius, min(abs(x2 - x1), abs(y2 - y1)));
+  x1 = min(x1, x2);
+  x2 = max(x1, x2);
+  y1 = min(y1, y2);
+  y2 = max(y1, y2);
+  int r = min(radius, min(x2 - x1, y2 - y1));
   int height = y2 - y1;
   int width = x2 - x1;
   gfx_FillRectangle(x1, y1 + r, width + 1, height - r * 2);
