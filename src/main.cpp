@@ -1,7 +1,7 @@
-#define ENABLE_TESTS true
+#define ENABLE_TESTS false
 
 // Just for debug purposes
-#define RESET_DATA true
+#define RESET_DATA false
 
 #ifndef __INT24_TYPE__
 #define __INT24_TYPE__
@@ -102,27 +102,111 @@ void begin() {
       dbg_printf("Error reading data!");
       exit(0);
     }
-    fat_ptr<uint8_t> data = serialize_decks(global_state.decks);
-    ti_Write(data.ptr, 1, data.size, handle);
+    // Initialize with empty data
+    dbg_printf("Creating new data file with empty data\n");
+    fat_ptr<uint8_t> deck_data = serialize_decks(global_state.decks);
+    fat_ptr<uint8_t> user_card_data =
+        serialize_user_cards({global_state.user_cards, 4});
+
+    dbg_printf("Initial deck data size: %d bytes\n", deck_data.size);
+    dbg_printf("Initial user card data size: %d bytes\n", user_card_data.size);
+
+    // Write both deck and user card data
+    ti_Write(deck_data.ptr, 1, deck_data.size, handle);
+    ti_Write(user_card_data.ptr, 1, user_card_data.size, handle);
+
+    // Free memory
+    delete[] deck_data.ptr;
+    if (user_card_data.ptr)
+      delete[] user_card_data.ptr;
   }
 
-  uint16_t size = ti_GetSize(handle);
+  uint16_t total_size = ti_GetSize(handle);
+  dbg_printf("Total file size: %d bytes\n", total_size);
+  fat_ptr<uint8_t> buf = {new uint8_t[total_size], total_size};
 
-  fat_ptr<uint8_t> buf = {new uint8_t[size], size};
-
-  ti_Read(buf.ptr, sizeof(uint8_t), size, handle);
+  ti_Read(buf.ptr, sizeof(uint8_t), total_size, handle);
 
   ti_SetArchiveStatus(true, handle);
-
   ti_Close(handle);
 
+  // First, deserialize deck data
   fat_ptr<deck_t> decks = deserialize_decks(buf);
-
+  dbg_printf("Deserialized %d decks\n", decks.size);
   for (size_t i = 0; i < decks.size; i++) {
     global_state.decks[i] = decks.ptr[i];
-  };
+    dbg_printf("Deck %d: '%s' with %d cards\n", i, global_state.decks[i].name,
+               global_state.decks[i].cards.size);
+  }
 
-  dbg_printf("User Data Size: %d\n", size);
+  // Calculate offset of user cards data
+  size_t deck_data_size = 0;
+
+  // Calculate the size of deck data (1 byte deck count + deck data)
+  if (decks.ptr && decks.size > 0) {
+    // Calculate deck data size - we need this to offset into the buffer for
+    // user cards Include header (1 byte) and iterate through each deck to add
+    // up sizes
+    deck_data_size = 1; // Start with header byte
+    for (size_t i = 0; i < MAX_DECKS; i++) {
+      // Add 1 byte for card count
+      deck_data_size += 1;
+      // Add 1 byte for name length + actual name length
+      size_t name_length = strnlen(decks.ptr[i].name, MAX_DECK_NAME_LENGTH);
+      if (name_length == 0) {
+        // Default name if blank
+        char default_name[16];
+        sprintf(default_name, "Deck %u", i + 1);
+        name_length = strlen(default_name);
+      }
+      deck_data_size += 1 + name_length;
+      // Add card data size
+      if (decks.ptr[i].cards.ptr && decks.ptr[i].cards.size > 0) {
+        deck_data_size += decks.ptr[i].cards.size * CARD_BYTES;
+      }
+    }
+    dbg_printf("Calculated deck data size: %d bytes\n", deck_data_size);
+  }
+
+  // Clean up the deck pointer
+  if (decks.ptr)
+    delete[] decks.ptr;
+
+  // Now deserialize user cards if there's data left
+  dbg_printf("Looking for user cards data at offset %d\n", deck_data_size);
+  if (total_size > deck_data_size) {
+    fat_ptr<uint8_t> user_cards_buf = {buf.ptr + deck_data_size,
+                                       total_size - deck_data_size};
+
+    dbg_printf("User cards buffer size: %d bytes\n", user_cards_buf.size);
+    dbg_printf("First byte (card count): %d\n", user_cards_buf.ptr[0]);
+
+    fat_ptr<user_card> data = deserialize_user_cards(user_cards_buf);
+    dbg_printf("Deserialized %d user cards\n", data.size);
+
+    if (data.size > 0) {
+      memcpy(global_state.user_cards, data.ptr, data.size * sizeof(user_card));
+      dbg_printf("Copied user cards to global state\n");
+
+      // Print debug info for the first few cards
+      for (size_t i = 0; i < data.size && i < 3; i++) {
+        dbg_printf("Card %d: ID=%d, Count=%d\n", i, data.ptr[i].card,
+                   data.ptr[i].count);
+      }
+
+      // Clean up
+      delete[] data.ptr;
+    } else {
+      dbg_printf("No user cards found in data\n");
+    }
+  } else {
+    dbg_printf("No user cards section found in file\n");
+  }
+
+  // Clean up the buffer
+  delete[] buf.ptr;
+
+  dbg_printf("User Data Size: %d\n", total_size);
 
   if (ENABLE_TESTS) {
     dbg_printf("\nRUNNING TESTS\n");
@@ -154,17 +238,46 @@ bool save_data() {
   uint8_t handle;
 
   if ((handle = ti_Open(DATA_FILE_NAME, "w+")) == 0) {
+    dbg_printf("Failed to open file for writing\n");
     return false;
   }
 
-  fat_ptr<uint8_t> buf = serialize_decks(global_state.decks);
+  fat_ptr<uint8_t> deck_buf = serialize_decks(global_state.decks);
+  dbg_printf("Serialized deck data size: %d bytes\n", deck_buf.size);
 
-  ti_Write(buf.ptr, sizeof(uint8_t), buf.size, handle);
+  fat_ptr<uint8_t> user_cards_buf =
+      serialize_user_cards({global_state.user_cards, 4});
+  dbg_printf("Serialized user cards data size: %d bytes\n",
+             user_cards_buf.size);
 
-  dbg_printf("User Data Size: %d\n", buf.size);
+  // Debug info about user cards being saved
+  dbg_printf("Saving %d user cards:\n",
+             4);                   // Assuming 4 from the hardcoded size
+  for (size_t i = 0; i < 4; i++) { // Print first 3 at most
+    dbg_printf("Card %d: ID=%d, Count=%d\n", i, global_state.user_cards[i].card,
+               global_state.user_cards[i].count);
+  }
+
+  // Write deck data
+  ti_Write(deck_buf.ptr, sizeof(uint8_t), deck_buf.size, handle);
+
+  // Write user cards data
+  if (!is_fat_nullptr(user_cards_buf)) {
+    ti_Write(user_cards_buf.ptr, sizeof(uint8_t), user_cards_buf.size, handle);
+  }
+
+  // Clean up
+  if (deck_buf.ptr)
+    delete[] deck_buf.ptr;
+  if (user_cards_buf.ptr)
+    delete[] user_cards_buf.ptr;
+
+#ifndef NDEBUG
+  uint16_t total_size = ti_GetSize(handle);
+  dbg_printf("Total User Data Size: %d bytes\n", total_size);
+#endif
 
   ti_SetArchiveStatus(true, handle);
-
   ti_Close(handle);
 
   return true;
