@@ -5,6 +5,7 @@
 NAME = TiCeG
 ICON = icon.png
 DESCRIPTION = "A Trading Card Game (TCG) meant for the TI 84 Plus CE family"
+HAS_PRINTF = NO
 # COMPRESSED = YES
 # COMPRESSED_MODE = zx0
 

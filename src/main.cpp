@@ -1,7 +1,7 @@
-#define ENABLE_TESTS false
+#define ENABLE_TESTS true
 
 // Just for debug purposes
-#define RESET_DATA false
+#define RESET_DATA true
 
 #ifndef __INT24_TYPE__
 #define __INT24_TYPE__
@@ -27,9 +27,6 @@
 #include <tice.h>
 
 state_t global_state;
-
-const char *CARD_NAMES[] = {"Test Card 1", "Test Card 2", "Test Card 3",
-                            "Test Card 4"};
 
 gfx_UninitedRLETSprite(battle_icon, battle_icon_size);
 gfx_UninitedRLETSprite(trade_icon, trade_icon_size);
@@ -84,7 +81,7 @@ __attribute__((always_inline)) inline bool ticeg_ResetFont() {
 const char *DATA_FILE_NAME = "TiCeG Data";
 
 void begin() {
-  state_t state = {M_HOME, {[0 ... 9] = EMPTY_DECK}};
+  state_t state = {M_HOME, {[0 ... 9] = EMPTY_DECK}, {}};
   global_state = state;
   zx0_Decompress(battle_icon, battle_icon_compressed);
   zx0_Decompress(trade_icon, trade_icon_compressed);
@@ -128,6 +125,7 @@ void begin() {
   dbg_printf("User Data Size: %d\n", size);
 
   if (ENABLE_TESTS) {
+    dbg_printf("\nRUNNING TESTS\n");
     test_serialize();
   }
 }
@@ -230,6 +228,8 @@ const char *serialize_card_type(card_type_t type) {
 card_type_t DECK_PANEL_CARD_TYPE = T_UNIT_CARD;
 card_type_t CARDS_PANEL_CARD_TYPE = T_SUPPORT_CARD;
 
+bool DECK_PANEL_SELECTED = true;
+
 void drawDeckEditScreen() {
   gfx_FillScreen(0xC3);
   ticeg_SetFont(FONT_CHERRY_20);
@@ -240,8 +240,11 @@ void drawDeckEditScreen() {
   fontlib_DrawStringCentered("DECKS", LCD_WIDTH / 4, 20);
   gfx_FillRoundedRect(LCD_WIDTH / 2 + 5, 0, LCD_WIDTH, 40, 8);
   fontlib_DrawStringCentered("YOUR CARDS", LCD_WIDTH / 4 * 3 + 5, 20);
+  gfx_SetColor(DECK_PANEL_SELECTED ? 0xC5 : 0xC1);
   gfx_FillRoundedRect(0, 45, LCD_WIDTH / 2, LCD_HEIGHT - 35, 8);
+  gfx_SetColor(DECK_PANEL_SELECTED ? 0xC1 : 0xC5);
   gfx_FillRoundedRect(LCD_WIDTH / 2 + 5, 45, LCD_WIDTH, LCD_HEIGHT, 8);
+  gfx_SetColor(0xC1);
 
   gfx_FillRoundedRect(0, LCD_HEIGHT - 30, LCD_WIDTH / 2, LCD_HEIGHT, 8);
   ticeg_SetFont(FONT_CHERRY_10);
@@ -265,6 +268,9 @@ void drawDeckEditScreen() {
 uint8_t SELECTED_DECK_INDEX = 0;
 
 bool EDITING_DECK_NAME = false;
+
+char CURRENT_INPUT[MAX_DECK_NAME_LENGTH] = {};
+size_t CURRENT_INPUT_IDX = 0;
 
 void drawDeckScreen() {
   gfx_FillScreen(0xC3);
@@ -301,12 +307,8 @@ void drawDeckScreen() {
     fontlib_SetCursorPosition(15, 46 + i * 15);
 
     if (deck_name[0] == '\0') {
-      if (!is_fat_nullptr(deck.cards)) {
-        fontlib_DrawString("Deck ");
-        fontlib_DrawString(digit_table[i + 1]);
-      } else {
-        fontlib_DrawString("<EMPTY>");
-      }
+      fontlib_DrawString("Deck ");
+      fontlib_DrawString(digit_table[i + 1]);
     } else {
       fontlib_DrawString(deck_name);
     }
@@ -320,6 +322,15 @@ void drawDeckScreen() {
     gfx_FillRoundedRect(
         LCD_WIDTH / 8 + BORDER_WIDTH, LCD_HEIGHT / 4 + BORDER_WIDTH,
         LCD_WIDTH / 8 * 7 - BORDER_WIDTH, LCD_HEIGHT / 4 * 3 - BORDER_WIDTH, 8);
+
+    char buf[50];
+
+    sprintf(buf, "Renaming deck %u", SELECTED_DECK_INDEX + 1);
+
+    fontlib_DrawStringCentered(buf, LCD_WIDTH / 2, LCD_HEIGHT / 2 - 40);
+
+    fontlib_SetCursorPosition(LCD_WIDTH / 8 + BORDER_WIDTH + 5, LCD_HEIGHT / 2);
+    fontlib_DrawString(CURRENT_INPUT);
   }
 }
 
@@ -337,6 +348,21 @@ void draw() {
   default:
     break;
   }
+}
+
+const char *chars = "\0\0\0\0\0\0\0\0\0\0\"WRMH\0\0\0\0VQLG\0\0\0ZUPKFC\0 "
+                    "YTOJEB\0\0XSNIDA\0\0\0\0\0\0\0\0";
+
+#define CLEAR_DECK_NAME(deck) memset(deck, '\0', MAX_DECK_NAME_LENGTH)
+
+bool is_string_empty(char *str) {
+  size_t len = strlen(str);
+  for (size_t i = 0; i < len; i++) {
+    if (!isspace(str[i])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool step() {
@@ -386,14 +412,67 @@ bool step() {
       case sk_Stat:
         EDITING_DECK_NAME = true;
         break;
+      case sk_Del:
+        global_state.decks[SELECTED_DECK_INDEX].cards = fat_nullptr<card_t>;
+        CLEAR_DECK_NAME(global_state.decks[SELECTED_DECK_INDEX].name);
+        break;
       case sk_Enter:
         global_state.current_screen = M_EDIT_DECK;
         break;
       }
     } else {
       if (key == sk_Clear) {
+        CLEAR_DECK_NAME(CURRENT_INPUT);
         EDITING_DECK_NAME = false;
+        CURRENT_INPUT_IDX = 0;
+      } else if (key == sk_Enter) {
+        char *ptr = global_state.decks[SELECTED_DECK_INDEX].name;
+        CLEAR_DECK_NAME(ptr);
+        memcpy(ptr, CURRENT_INPUT, CURRENT_INPUT_IDX);
+        CLEAR_DECK_NAME(CURRENT_INPUT);
+        EDITING_DECK_NAME = false;
+        CURRENT_INPUT_IDX = 0;
+        if (is_string_empty(ptr)) {
+          CLEAR_DECK_NAME(ptr);
+          char buf[16];
+          sprintf(buf, "Deck %u", SELECTED_DECK_INDEX + 1);
+          memcpy(ptr, buf, 16);
+        }
+      } else if (key == sk_Del) {
+        CURRENT_INPUT[--CURRENT_INPUT_IDX] = '\0';
+      } else {
+        char c;
+        if ((c = chars[key]) != '\0') {
+          if (CURRENT_INPUT_IDX < MAX_DECK_NAME_LENGTH - 1) {
+            CURRENT_INPUT[CURRENT_INPUT_IDX++] = c;
+          }
+        }
       }
+    }
+  } else if (global_state.current_screen == M_EDIT_DECK) {
+    switch (key) {
+    case sk_Mode:
+      // Toggle
+      DECK_PANEL_SELECTED ^= true;
+      break;
+    case sk_Left:
+      if (DECK_PANEL_SELECTED) {
+        DECK_PANEL_CARD_TYPE = static_cast<card_type_t>(
+            (static_cast<int>(DECK_PANEL_CARD_TYPE) + 4 - 1) % 4);
+      } else {
+        CARDS_PANEL_CARD_TYPE = static_cast<card_type_t>(
+            (static_cast<int>(CARDS_PANEL_CARD_TYPE) + 4 - 1) % 4);
+      }
+      break;
+    case sk_Right:
+      if (DECK_PANEL_SELECTED) {
+        DECK_PANEL_CARD_TYPE = static_cast<card_type_t>(
+            (static_cast<int>(DECK_PANEL_CARD_TYPE) + 1) % 4);
+      } else {
+        CARDS_PANEL_CARD_TYPE = static_cast<card_type_t>(
+            (static_cast<int>(CARDS_PANEL_CARD_TYPE) + 1) % 4);
+      }
+      break;
     }
   }
 
